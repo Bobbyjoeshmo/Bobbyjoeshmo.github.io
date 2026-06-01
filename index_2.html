@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recession Indicators Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0c0f; --surface: #0f1318; --surface2: #131a22;
+      --border: #1e2530; --border2: #263040;
+      --red: #e84040; --red-dim: #7a1f1f; --red-bg: rgba(232,64,64,0.07);
+      --yellow: #d4a017; --yellow-dim: #5a4010; --yellow-bg: rgba(212,160,23,0.07);
+      --green: #2ecc71; --green-dim: #1a6640; --green-bg: rgba(46,204,113,0.07);
+      --blue: #4a9eff;
+      --text: #c8d4e0; --text-dim: #5a6878; --text-bright: #eaf2fb;
+      --mono: 'IBM Plex Mono', monospace; --sans: 'IBM Plex Sans', sans-serif;
+    }
+    html, body { min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--mono); }
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.05) 2px, rgba(0,0,0,0.05) 4px);
+    }
+
+    /* ── Header ── */
+    header { border-bottom: 1px solid var(--border); padding: 1.1rem 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .6rem; }
+    .site-title { font-family: var(--sans); font-size: .95rem; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--text-bright); }
+    .header-right { display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap; }
+    .pulse-wrap { display: flex; align-items: center; gap: .5rem; font-size: .65rem; letter-spacing: .15em; text-transform: uppercase; }
+    .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 0 rgba(232,64,64,.5); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(232,64,64,.5)} 70%{box-shadow:0 0 0 7px rgba(232,64,64,0)} 100%{box-shadow:0 0 0 0 rgba(232,64,64,0)} }
+
+    /* ── Period tabs ── */
+    .tabs-bar { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 2rem; }
+    .tab-btn {
+      background: none; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px;
+      padding: .75rem 1.4rem; font-family: var(--mono); font-size: .72rem; letter-spacing: .18em;
+      text-transform: uppercase; color: var(--text-dim); cursor: pointer; transition: color .2s, border-color .2s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    /* ── Summary banner ── */
+    .summary {
+      margin: 1.2rem 2rem .8rem; padding: .9rem 1.4rem;
+      background: rgba(232,64,64,.05); border: 1px solid var(--red-dim); border-left: 3px solid var(--red);
+      display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;
+      transition: opacity .3s;
+    }
+    .summary-item { display: flex; flex-direction: column; gap: .2rem; }
+    .summary-label { font-size: .58rem; letter-spacing: .25em; text-transform: uppercase; color: var(--text-dim); font-family: var(--sans); }
+    .summary-val { font-size: .75rem; color: var(--red); letter-spacing: .08em; }
+    .summary-div { width: 1px; height: 2.2rem; background: var(--border2); align-self: center; }
+
+    /* ── Grid ── */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 1px; background: var(--border); margin: 0 2rem 2rem; border: 1px solid var(--border); }
+
+    /* ── Card ── */
+    .card {
+      background: var(--surface); padding: 1.3rem 1.5rem; position: relative;
+      cursor: pointer; transition: background .18s;
+    }
+    .card:hover { background: #121a22; }
+    .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+    .card.red::before    { background: var(--red); }
+    .card.yellow::before { background: var(--yellow); }
+    .card.green::before  { background: var(--green); }
+
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: .85rem; }
+    .card-tag { font-size: .58rem; letter-spacing: .28em; text-transform: uppercase; padding: .18rem .45rem; border: 1px solid; font-family: var(--sans); }
+    .card.red    .card-tag { color: var(--red);    border-color: var(--red-dim);    background: var(--red-bg); }
+    .card.yellow .card-tag { color: var(--yellow); border-color: var(--yellow-dim); background: var(--yellow-bg); }
+    .card.green  .card-tag { color: var(--green);  border-color: var(--green-dim);  background: var(--green-bg); }
+    .card-signal { font-size: .6rem; letter-spacing: .18em; text-transform: uppercase; color: var(--text-dim); }
+
+    .card-name   { font-size: .7rem; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--text-bright); margin-bottom: .25rem; font-family: var(--sans); }
+    .card-aspect { font-size: .6rem; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1rem; }
+
+    .card-value-row { display: flex; align-items: baseline; justify-content: space-between; border-top: 1px solid var(--border); padding-top: .9rem; }
+    .card-value { font-size: 1.8rem; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+    .card.red    .card-value { color: var(--red); }
+    .card.yellow .card-value { color: var(--yellow); }
+    .card.green  .card-value { color: var(--green); }
+    .card-unit { font-size: .6rem; color: var(--text-dim); letter-spacing: .12em; align-self: flex-end; padding-bottom: .2rem; }
+
+    .gauge-wrap { margin-top: .7rem; }
+    .gauge-track { height: 2px; background: var(--border2); }
+    .gauge-fill { height: 100%; width: 0; transition: width 1s cubic-bezier(.22,1,.36,1); }
+    .card.red    .gauge-fill { background: var(--red); }
+    .card.yellow .gauge-fill { background: var(--yellow); }
+    .card.green  .gauge-fill { background: var(--green); }
+
+    .card-note { font-size: .6rem; color: var(--text-dim); margin-top: .65rem; line-height: 1.6; font-family: var(--sans); font-weight: 300; }
+
+    /* ── Modal overlay ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 1000;
+      display: flex; align-items: center; justify-content: center; padding: 1.5rem;
+      opacity: 0; pointer-events: none; transition: opacity .22s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: auto; }
+    .modal {
+      background: #0d1218; border: 1px solid var(--border2); max-width: 520px; width: 100%;
+      padding: 2rem; position: relative; transform: translateY(12px); transition: transform .22s;
+    }
+    .modal-overlay.open .modal { transform: translateY(0); }
+    .modal-close {
+      position: absolute; top: 1rem; right: 1rem; background: none; border: none;
+      color: var(--text-dim); font-size: 1.1rem; cursor: pointer; line-height: 1; padding: .2rem .4rem;
+    }
+    .modal-close:hover { color: var(--text-bright); }
+    .modal-indicator-name { font-family: var(--sans); font-size: .75rem; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--text-bright); margin-bottom: .2rem; }
+    .modal-aspect { font-size: .62rem; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 1.3rem; }
+    .modal-section-title { font-size: .6rem; letter-spacing: .25em; text-transform: uppercase; color: var(--text-dim); margin-bottom: .6rem; border-bottom: 1px solid var(--border); padding-bottom: .4rem; }
+    .modal-desc { font-size: .72rem; line-height: 1.7; color: var(--text); font-family: var(--sans); font-weight: 300; margin-bottom: 1.4rem; }
+    .threshold-table { width: 100%; border-collapse: collapse; margin-bottom: .5rem; }
+    .threshold-table td { padding: .5rem .6rem; font-size: .66rem; font-family: var(--sans); border-bottom: 1px solid var(--border); line-height: 1.5; }
+    .threshold-table tr:last-child td { border-bottom: none; }
+    .th-dot { width: 8px; height: 8px; border-radius: 1px; display: inline-block; margin-right: .5rem; vertical-align: middle; }
+    .th-label { font-weight: 500; }
+
+    /* ── Footer ── */
+    footer { border-top: 1px solid var(--border); padding: .9rem 2rem; display: flex; gap: 2rem; flex-wrap: wrap; justify-content: space-between; }
+    .legend { display: flex; gap: 1.4rem; align-items: center; }
+    .legend-item { display: flex; align-items: center; gap: .4rem; font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; color: var(--text-dim); }
+    .legend-dot { width: 8px; height: 8px; border-radius: 1px; }
+    .footer-note { font-size: .58rem; color: var(--text-dim); font-family: var(--sans); letter-spacing: .04em; align-self: center; }
+
+    @media (max-width: 680px) {
+      header, .summary, footer { margin-left: 1rem; margin-right: 1rem; padding-left: 1rem; padding-right: 1rem; }
+      .grid { margin: 0 0 2rem; border-left: none; border-right: none; }
+      .tabs-bar { padding: 0 1rem; }
+      .card-value { font-size: 1.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="site-title">Recession Indicators Dashboard</span>
+  <div class="header-right">
+    <div class="pulse-wrap">
+      <div class="pulse"></div>
+      <span style="color:var(--red);" id="header-signal">Elevated Risk</span>
+    </div>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" data-period="0">Q1 2023 &nbsp;·&nbsp; 03/31/2023</button>
+  <button class="tab-btn"        data-period="1">Q1 2024 &nbsp;·&nbsp; 03/31/2024</button>
+</div>
+
+<div class="summary" id="summary-bar">
+  <div class="summary-item">
+    <span class="summary-label">Period</span>
+    <span class="summary-val" id="sum-period">Q1 2023 — 03/31/2023</span>
+  </div>
+  <div class="summary-div"></div>
+  <div class="summary-item">
+    <span class="summary-label">Overall Signal</span>
+    <span class="summary-val" id="sum-signal">6/12 indicators cautionary or recessionary</span>
+  </div>
+  <div class="summary-div"></div>
+  <div class="summary-item">
+    <span class="summary-label">Key Concern</span>
+    <span class="summary-val" id="sum-concern">Yield curve at deepest inversion since 1981 · Credit conditions tightening sharply</span>
+  </div>
+  <div class="summary-div"></div>
+  <div class="summary-item">
+    <span class="summary-label">Click any card</span>
+    <span class="summary-val" style="color:var(--blue)">to see thresholds & methodology</span>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<footer>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Recessionary</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Cautionary</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Healthy</div>
+  </div>
+  <div class="footer-note" id="footer-note">Q1 2023: BEA data reflects Feb 2023 (released 3/31/23). Sources: FRED · BEA · ISM · UMich · Federal Reserve · S&P Global.</div>
+</footer>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">✕</button>
+    <div class="modal-indicator-name" id="modal-name"></div>
+    <div class="modal-aspect" id="modal-aspect"></div>
+    <div class="modal-section-title">What it measures</div>
+    <div class="modal-desc" id="modal-desc"></div>
+    <div class="modal-section-title">Signal thresholds</div>
+    <table class="threshold-table" id="modal-thresholds"></table>
+  </div>
+</div>
+
+<script>
+const DEFINITIONS = {
+  "Yield Curve": {
+    desc: "The 10-year minus 2-year U.S. Treasury yield spread (T10Y2Y). When short-term yields exceed long-term yields, the curve 'inverts,' signaling that bond markets expect future rate cuts in response to an economic slowdown. Every U.S. recession since 1970 has been preceded by an inversion, with a lead time of 6–24 months.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Spread above +10 bps — normal upward-sloping curve; bond markets pricing in growth." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Spread between −10 and +10 bps — flat curve; elevated uncertainty about near-term growth." },
+      { color: "var(--red)",    label: "Recessionary", text: "Spread below −10 bps (inverted) — historically a reliable recession leading indicator; deeper and longer inversions increase risk." },
+    ]
+  },
+  "Core PCE": {
+    desc: "Core Personal Consumption Expenditures price index, excluding food and energy. The Federal Reserve's preferred inflation gauge, used to assess progress toward its 2% inflation target. High core PCE limits the Fed's ability to cut rates in response to economic weakness, increasing the risk of a 'hard landing.'",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "YoY below 2.5% — near the Fed's 2% target; gives the Fed room to support growth if needed." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "YoY between 2.5% and 3.5% — inflation above target but moderating; Fed policy constrained." },
+      { color: "var(--red)",    label: "Recessionary", text: "YoY above 3.5% — significantly above target; forces the Fed to maintain restrictive policy, raising hard-landing risk." },
+    ]
+  },
+  "Corp Bond vs UST Spread": {
+    desc: "The option-adjusted spread (OAS) of investment-grade corporate bonds versus comparable U.S. Treasury yields (ICE BofA IG Corporate Index). A wider spread reflects greater perceived credit risk in the private sector. Spreads widen sharply when recession fears mount and investors demand higher compensation for holding corporate debt.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "OAS below 120 bps — credit markets calm; companies can borrow at near-normal rates." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "OAS between 120–200 bps — some stress; indicates rising concern about corporate credit quality." },
+      { color: "var(--red)",    label: "Recessionary", text: "OAS above 200 bps — significant credit stress; historically associated with recession or financial market disruption." },
+    ]
+  },
+  "SLOOS (C&I Loans)": {
+    desc: "The Federal Reserve's Senior Loan Officer Opinion Survey measures the net percentage of banks tightening lending standards for Commercial & Industrial (C&I) loans. Tighter credit conditions reduce business investment and consumer spending. The SLOOS has historically anticipated recessions and is closely monitored by the Fed.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Net tightening below 10% — most banks maintaining or easing standards; credit readily available." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Net tightening 10–25% — moderate tightening; some headwind to credit growth." },
+      { color: "var(--red)",    label: "Recessionary", text: "Net tightening above 25% — readings above 30–40% have historically coincided with or preceded recessions." },
+    ]
+  },
+  "ISM Mfg. PMI": {
+    desc: "The Institute for Supply Management's Manufacturing Purchasing Managers' Index. Based on surveys of purchasing executives across 18 industries, it tracks new orders, production, employment, supplier deliveries, and inventories. A reading above 50 signals expansion, below 50 contraction. It is one of the most timely leading indicators of the broader economy.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Above 52 — manufacturing expanding; historically associated with positive GDP growth." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Between 48.7 and 52 — modest contraction to modest expansion; neutral economic signal." },
+      { color: "var(--red)",    label: "Recessionary", text: "Below 48.7 for multiple months — sustained contraction consistent with broader GDP contraction. Below 45 is severe." },
+    ]
+  },
+  "Housing Starts": {
+    desc: "The annualized number of new residential construction projects begun in a given month (Census Bureau/HUD). Housing is one of the most interest-rate-sensitive sectors of the economy. A significant and sustained decline in starts is a reliable leading indicator of broader economic weakness, as it signals declining confidence and restricted access to credit.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Above 1.4M annualized — healthy construction activity; consistent with a growing economy." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Between 1.1M and 1.4M — slowing starts; mortgage rates or weak demand may be weighing on new construction." },
+      { color: "var(--red)",    label: "Recessionary", text: "Below 1.1M annualized — sharp contraction; readings this low have historically coincided with recessions." },
+    ]
+  },
+  "Sahm Rule": {
+    desc: "Created by economist Claudia Sahm, this indicator signals recession onset when the three-month moving average of the national unemployment rate (U3) rises 0.50 percentage points or more above its 12-month low. It has triggered in every U.S. recession since 1950, making it one of the most reliable real-time recession identifiers.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Reading below 0.20 ppt — unemployment stable or declining; no recessionary pressure in labor market." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Reading between 0.20 and 0.50 ppt — labor market showing stress; approaching trigger level." },
+      { color: "var(--red)",    label: "Recessionary", text: "Reading at or above 0.50 ppt — rule triggered; historically signals recession is already underway." },
+    ]
+  },
+  "Weekly Jobless Claims": {
+    desc: "Initial unemployment insurance claims filed each week (Department of Labor). This is one of the most timely labor market indicators, published weekly. A sustained uptrend indicates that employers are beginning to lay off workers, which typically precedes a broader increase in unemployment and consumer spending pullback.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Below 250K — low claims; labor market tight and employers retaining workers." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Between 250K and 350K — rising claims; early signs of labor market softening." },
+      { color: "var(--red)",    label: "Recessionary", text: "Above 350K — elevated claims consistent with recession or significant labor market deterioration." },
+    ]
+  },
+  "UMich Consumer Sentiment": {
+    desc: "The University of Michigan's Index of Consumer Sentiment, based on monthly surveys measuring consumers' views of their personal finances, business conditions, and buying intentions. Consumer spending represents ~70% of U.S. GDP, so sustained pessimism can become a self-fulfilling driver of slowdown. The index is benchmarked to Q1 1966 = 100.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Above 80 — consumers broadly optimistic about finances and economic outlook." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Between 60 and 80 — sentiment depressed; consumers cautious; spending headwinds possible." },
+      { color: "var(--red)",    label: "Recessionary", text: "Below 60 — deeply pessimistic; historically consistent with recession or near-recession conditions. All-time low was 50.0 (June 2022)." },
+    ]
+  },
+  "Real Personal Income ex-Transfers": {
+    desc: "Inflation-adjusted personal income excluding government transfer payments (BEA). By stripping out transfers like Social Security and unemployment benefits, this measure captures underlying earned income growth. It is one of the primary indicators the NBER uses to determine recession dates. Sustained declines are a key recessionary signal.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "MoM growth positive; YoY above 1.5% — real wages keeping pace with or outpacing inflation." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Flat to slightly positive MoM; YoY 0–1.5% — income growing but barely offsetting inflation; consumer pressure building." },
+      { color: "var(--red)",    label: "Recessionary", text: "MoM negative for 2+ months; sustained YoY decline — NBER uses this as a primary recession dating criterion." },
+    ]
+  },
+  "S&P 500": {
+    desc: "The S&P 500 index tracks the performance of 500 large U.S. companies and is the most widely followed equity benchmark. Stock markets are forward-looking — a sustained bear market (≥20% decline from peak) often signals that investors expect significant deterioration in corporate earnings and economic activity, making it a leading recession indicator.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Near all-time highs or in bull market — markets pricing in continued growth and earnings expansion." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Correction (−10% to −20% from recent peak) — investor uncertainty; potential early warning of economic slowdown." },
+      { color: "var(--red)",    label: "Recessionary", text: "Bear market (−20%+ from peak) — historically coincides with or slightly leads recession; 7 of last 9 bear markets accompanied a recession." },
+    ]
+  },
+  "Russell 2000": {
+    desc: "The Russell 2000 index tracks 2,000 small-cap U.S. companies. Small caps are more sensitive to domestic economic conditions, domestic credit availability, and interest rates than large-cap multinationals. Because small companies rely more heavily on bank financing, the Russell 2000 often leads the S&P 500 as a recession signal.",
+    thresholds: [
+      { color: "var(--green)",  label: "Healthy",      text: "Near recent highs; outperforming or in line with large-caps — small business conditions healthy; credit accessible." },
+      { color: "var(--yellow)", label: "Cautionary",   text: "Underperforming large-caps significantly or in correction — small business stress; tighter credit conditions showing." },
+      { color: "var(--red)",    label: "Recessionary", text: "In bear market (−20%+) or significantly lagging large-caps for extended period — small-cap weakness historically precedes broad recession." },
+    ]
+  },
+};
+
+const PERIODS = [
+  {
+    label: "Q1 2023 — 03/31/2023",
+    signal: "6/12 indicators cautionary or recessionary",
+    concern: "Yield curve at deepest inversion since 1981 · Credit conditions tightening sharply",
+    footerNote: "Q1 2023: BEA data reflects Feb 2023 (released 3/31/23). Sources: FRED · BEA · ISM · UMich · Federal Reserve · S&P Global.",
+    indicators: [
+      { name:"Yield Curve",           aspect:"Growth Expectations",  value:"−58",    unit:"bps (10Y−2Y)",       status:"red",    tag:"Inverted",      fill:88, note:"Deepest inversion since 1981. Still in the recessionary zone after inverting in July 2022. Every recession since 1970 was preceded by a similar inversion." },
+      { name:"Core PCE",              aspect:"Inflation",            value:"4.6%",   unit:"YoY (Feb 2023)",     status:"red",    tag:"Well Above Target",fill:80, note:"Far above the Fed's 2% target. Released 3/31/23. Forces the Fed to maintain high rates, increasing hard-landing risk." },
+      { name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",  value:"150",    unit:"bps IG OAS",         status:"yellow", tag:"Elevated",      fill:50, note:"ICE BofA IG Corp OAS. Elevated above the 2021 lows (~80 bps). SVB/Signature bank stress in March 2023 contributed to spread widening." },
+      { name:"SLOOS (C&I Loans)",     aspect:"Banking Sector",       value:"46%",    unit:"net tightening",     status:"red",    tag:"Tightening",    fill:82, note:"Q1 2023 result. ~46% net share of banks tightened C&I lending standards — among the highest readings outside of a formal recession." },
+      { name:"ISM Mfg. PMI",          aspect:"Business Activity",    value:"46.3",   unit:"index",              status:"red",    tag:"Contraction",   fill:75, note:"5th consecutive month of contraction. Lowest reading since May 2020. Below 48.7 signals broader GDP contraction." },
+      { name:"Housing Starts",        aspect:"Housing Market",       value:"1.45M",  unit:"annualized (Jan '23)",status:"yellow",tag:"Moderating",    fill:48, note:"January 2023 data (most recent available 3/31/23). Down from 2022 peaks due to rapidly rising mortgage rates. Above 7% 30yr fixed." },
+      { name:"Sahm Rule",             aspect:"Labor Market",         value:"0.00",   unit:"ppt above 12-mo low",status:"green",  tag:"Not Triggered", fill:5,  note:"Unemployment at cycle low of 3.5% as of Feb 2023. Sahm Rule not triggered. Labor market still resilient." },
+      { name:"Weekly Jobless Claims", aspect:"Labor Market",         value:"198K",   unit:"initial claims",     status:"green",  tag:"Low",           fill:15, note:"Week ending 3/25/2023. Well below the 250–300K+ range historically associated with deteriorating labor markets." },
+      { name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"62.0",  unit:"index (1966=100)",   status:"yellow", tag:"Depressed",     fill:55, note:"Final March 2023 reading. Down from 67.0 in February. Historically, readings below 70 correlate with elevated recession risk." },
+      { name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.0%",unit:"MoM (Feb 2023)",status:"yellow",tag:"Stalling",fill:42, note:"Real income ex-transfers essentially flat in February 2023. Sustained declines are a primary NBER recession dating criterion." },
+      { name:"S&P 500",               aspect:"Stock Market",         value:"3,971",  unit:"index close",        status:"yellow", tag:"Off Peak",      fill:45, note:"S&P 500 closed at 3,971 on 3/31/2023 — still ~15% below its Jan 2022 all-time high of ~4,818, but recovering from the 2022 lows." },
+      { name:"Russell 2000",          aspect:"Stock Market",         value:"1,802",  unit:"index close",        status:"yellow", tag:"Lagging",       fill:50, note:"Russell 2000 at 1,802 on 3/31/2023 — significantly underperforming the S&P 500 YTD, reflecting small-cap sensitivity to credit tightening." },
+    ]
+  },
+  {
+    label: "Q1 2024 — 03/31/2024",
+    signal: "3/12 indicators cautionary or recessionary",
+    concern: "Yield curve still inverted · Inflation moderating but above target · Strong equities",
+    footerNote: "Q1 2024: BEA data reflects Feb 2024 (released 3/29/24). Sources: FRED · BEA · ISM · UMich · Federal Reserve · S&P Global.",
+    indicators: [
+      { name:"Yield Curve",           aspect:"Growth Expectations",  value:"−38",    unit:"bps (10Y−2Y)",       status:"red",    tag:"Still Inverted",fill:68, note:"Still inverted but less severe than the −58 bps of Q1 2023. Inversion peaked at −108 bps in July 2023 and has been normalizing since." },
+      { name:"Core PCE",              aspect:"Inflation",            value:"2.8%",   unit:"YoY (Feb 2024)",     status:"yellow", tag:"Above Target",  fill:48, note:"Released 3/29/2024. Significant improvement from 4.6% in Feb 2023. Still above 2% target but the disinflationary trend is clear." },
+      { name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",  value:"93",     unit:"bps IG OAS",         status:"green",  tag:"Tight",         fill:22, note:"ICE BofA IG Corp OAS tightened dramatically from 150 bps in 2023 to ~93 bps — near the tightest levels since 2021. Credit stress eased." },
+      { name:"SLOOS (C&I Loans)",     aspect:"Banking Sector",       value:"15%",    unit:"net tightening",     status:"yellow", tag:"Easing",        fill:28, note:"Q4 2023 SLOOS (most recent available 3/31/24). Down sharply from 46% peak in Q1 2023. Banks still cautious but notably less restrictive." },
+      { name:"ISM Mfg. PMI",          aspect:"Business Activity",    value:"50.3",   unit:"index",              status:"green",  tag:"Expansion",     fill:30, note:"First reading above 50 after 16 consecutive months of contraction. Manufacturing sector returned to expansion in March 2024." },
+      { name:"Housing Starts",        aspect:"Housing Market",       value:"1.52M",  unit:"annualized (Feb '24)",status:"green", tag:"Resilient",     fill:35, note:"February 2024 housing starts surged to 1.52M — well above expectations of 1.43M and the highest reading since August 2023." },
+      { name:"Sahm Rule",             aspect:"Labor Market",         value:"0.00",   unit:"ppt above 12-mo low",status:"green",  tag:"Not Triggered", fill:5,  note:"Unemployment at 3.9% in February 2024. The Sahm Rule is not triggered. Labor market remains in good shape despite Fed tightening." },
+      { name:"Weekly Jobless Claims", aspect:"Labor Market",         value:"210K",   unit:"initial claims",     status:"green",  tag:"Low",           fill:18, note:"Week ending 3/23/2024. Claims running at historically low levels. Labor market continues to confound recession expectations." },
+      { name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"79.4",  unit:"index (1966=100)",   status:"green",  tag:"Near 3yr High", fill:28, note:"Final March 2024 reading. Highest since July 2021. Major improvement from 62.0 in March 2023, driven by easing inflation expectations." },
+      { name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.4%",unit:"MoM (Feb 2024)",status:"green",tag:"Growing",fill:25, note:"Real personal income ex-transfers grew solidly in early 2024 as wage gains outpaced moderating inflation. Consumer in a much better position." },
+      { name:"S&P 500",               aspect:"Stock Market",         value:"5,254",  unit:"index close",        status:"green",  tag:"All-Time High",  fill:15, note:"S&P 500 closed at a record high of 5,254.35 on 3/28/2024 — its 22nd new all-time high of 2024, up 10.2% for Q1 2024." },
+      { name:"Russell 2000",          aspect:"Stock Market",         value:"~2,050", unit:"index close",        status:"yellow", tag:"Lagging",       fill:42, note:"Russell 2000 up ~5% in Q1 2024 vs. +10.2% for S&P 500. Small caps underperforming — still sensitive to higher-for-longer rate environment." },
+    ]
+  }
+];
+
+let activePeriod = 0;
+
+function renderPeriod(idx) {
+  activePeriod = idx;
+  const p = PERIODS[idx];
+  document.getElementById('sum-period').textContent   = p.label;
+  document.getElementById('sum-signal').textContent   = p.signal;
+  document.getElementById('sum-concern').textContent  = p.concern;
+  document.getElementById('footer-note').textContent  = p.footerNote;
+
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+
+  p.indicators.forEach((ind, i) => {
+    const card = document.createElement('div');
+    card.className = `card ${ind.status}`;
+    card.style.animationDelay = `${i * 0.04}s`;
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-tag">${ind.tag}</span>
+        <span class="card-signal">${ind.status === 'red' ? 'Recessionary' : ind.status === 'yellow' ? 'Cautionary' : 'Healthy'}</span>
+      </div>
+      <div class="card-name">${ind.name}</div>
+      <div class="card-aspect">${ind.aspect}</div>
+      <div class="card-value-row">
+        <span class="card-value">${ind.value}</span>
+        <span class="card-unit">${ind.unit}</span>
+      </div>
+      <div class="gauge-wrap"><div class="gauge-track"><div class="gauge-fill" style="width:0%" data-target="${ind.fill}"></div></div></div>
+      <div class="card-note">${ind.note}</div>
+    `;
+    card.addEventListener('click', () => openModal(ind.name, ind.aspect));
+    grid.appendChild(card);
+  });
+
+  // Animate gauges
+  requestAnimationFrame(() => {
+    setTimeout(() => {
+      document.querySelectorAll('.gauge-fill').forEach(el => { el.style.width = el.dataset.target + '%'; });
+    }, 200);
+  });
+}
+
+function openModal(name, aspect) {
+  const def = DEFINITIONS[name];
+  if (!def) return;
+  document.getElementById('modal-name').textContent   = name;
+  document.getElementById('modal-aspect').textContent = aspect;
+  document.getElementById('modal-desc').textContent   = def.desc;
+  const tbl = document.getElementById('modal-thresholds');
+  tbl.innerHTML = def.thresholds.map(t => `
+    <tr>
+      <td style="width:1px;white-space:nowrap">
+        <span class="th-dot" style="background:${t.color}"></span>
+        <span class="th-label" style="color:${t.color}">${t.label}</span>
+      </td>
+      <td style="color:var(--text-dim)">${t.text}</td>
+    </tr>
+  `).join('');
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderPeriod(parseInt(btn.dataset.period));
+  });
+});
+
+// Modal close
+document.getElementById('modal-close').addEventListener('click', () => { document.getElementById('modal-overlay').classList.remove('open'); });
+document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) document.getElementById('modal-overlay').classList.remove('open'); });
+
+renderPeriod(0);
+</script>
+</body>
+</html>
