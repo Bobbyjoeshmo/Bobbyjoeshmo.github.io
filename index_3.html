@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Recession Indicators Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0a0c0f;--surface:#0f1318;--surface2:#131a22;
+      --border:#1e2530;--border2:#263040;
+      --red:#e84040;--red-dim:#7a1f1f;--red-bg:rgba(232,64,64,.07);
+      --yellow:#d4a017;--yellow-dim:#5a4010;--yellow-bg:rgba(212,160,23,.07);
+      --green:#2ecc71;--green-dim:#1a6640;--green-bg:rgba(46,204,113,.07);
+      --blue:#4a9eff;--blue-dim:#1a3a6a;--blue-bg:rgba(74,158,255,.07);
+      --text:#c8d4e0;--text-dim:#5a6878;--text-bright:#eaf2fb;
+      --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+    }
+    html,body{min-height:100vh;background:var(--bg);color:var(--text);font-family:var(--mono)}
+    body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.04) 2px,rgba(0,0,0,.04) 4px)}
+
+    /* ── Header ── */
+    header{border-bottom:1px solid var(--border);padding:1rem 2rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem}
+    .site-title{font-family:var(--sans);font-size:.95rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text-bright)}
+    .pulse-wrap{display:flex;align-items:center;gap:.5rem;font-size:.64rem;letter-spacing:.15em;text-transform:uppercase}
+    .pulse{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 0 0 rgba(232,64,64,.5);animation:pulse 2s infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(232,64,64,.5)}70%{box-shadow:0 0 0 7px rgba(232,64,64,0)}100%{box-shadow:0 0 0 0 rgba(232,64,64,0)}}
+
+    /* ── Tabs bar ── */
+    .tabs-bar{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 2rem;overflow-x:auto;scrollbar-width:none}
+    .tabs-bar::-webkit-scrollbar{display:none}
+    .tab-btn{background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;padding:.7rem 1.1rem;font-family:var(--mono);font-size:.65rem;letter-spacing:.15em;text-transform:uppercase;color:var(--text-dim);cursor:pointer;transition:color .2s,border-color .2s;white-space:nowrap;flex-shrink:0}
+    .tab-btn:hover{color:var(--text)}
+    .tab-btn.active{color:var(--blue);border-bottom-color:var(--blue)}
+    .tab-btn.intro-tab.active{color:#b983ff;border-bottom-color:#b983ff}
+
+    /* ── Summary banner ── */
+    .summary{margin:1.1rem 2rem .7rem;padding:.85rem 1.3rem;background:rgba(232,64,64,.05);border:1px solid var(--red-dim);border-left:3px solid var(--red);display:flex;align-items:flex-start;gap:1.3rem;flex-wrap:wrap}
+    .summary-item{display:flex;flex-direction:column;gap:.25rem}
+    .summary-label{font-size:.57rem;letter-spacing:.25em;text-transform:uppercase;color:var(--text-dim);font-family:var(--sans)}
+    .summary-val{font-size:.72rem;color:var(--red);letter-spacing:.06em}
+    .summary-concerns{list-style:none;padding:0}
+    .summary-concerns li{font-size:.7rem;color:var(--red);letter-spacing:.04em;line-height:1.7}
+    .summary-concerns li::before{content:'▸ ';opacity:.7}
+    .summary-div{width:1px;height:2.5rem;background:var(--border2);align-self:center;flex-shrink:0}
+
+    /* ── Grid ── */
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1px;background:var(--border);margin:0 2rem 1rem;border:1px solid var(--border)}
+
+    /* ── Card ── */
+    .card{background:var(--surface);padding:1.2rem 1.4rem;position:relative;cursor:pointer;transition:background .18s}
+    .card:hover{background:#121a22}
+    .card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+    .card.red::before{background:var(--red)}.card.yellow::before{background:var(--yellow)}.card.green::before{background:var(--green)}
+    .card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem}
+    .card-tag{font-size:.57rem;letter-spacing:.26em;text-transform:uppercase;padding:.17rem .43rem;border:1px solid;font-family:var(--sans)}
+    .card.red .card-tag{color:var(--red);border-color:var(--red-dim);background:var(--red-bg)}
+    .card.yellow .card-tag{color:var(--yellow);border-color:var(--yellow-dim);background:var(--yellow-bg)}
+    .card.green .card-tag{color:var(--green);border-color:var(--green-dim);background:var(--green-bg)}
+    .card-signal{font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--text-dim)}
+    .card-name{font-size:.68rem;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--text-bright);margin-bottom:.22rem;font-family:var(--sans)}
+    .card-aspect{font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;color:var(--text-dim);margin-bottom:.9rem}
+    .card-value-row{display:flex;align-items:baseline;justify-content:space-between;border-top:1px solid var(--border);padding-top:.8rem}
+    .card-value{font-size:1.75rem;font-weight:600;letter-spacing:-.02em;line-height:1}
+    .card.red .card-value{color:var(--red)}.card.yellow .card-value{color:var(--yellow)}.card.green .card-value{color:var(--green)}
+    .card-unit{font-size:.58rem;color:var(--text-dim);letter-spacing:.1em;align-self:flex-end;padding-bottom:.18rem}
+    .gauge-wrap{margin-top:.6rem}
+    .gauge-track{height:2px;background:var(--border2)}
+    .gauge-fill{height:100%;width:0;transition:width 1s cubic-bezier(.22,1,.36,1)}
+    .card.red .gauge-fill{background:var(--red)}.card.yellow .gauge-fill{background:var(--yellow)}.card.green .gauge-fill{background:var(--green)}
+    .card-note{font-size:.59rem;color:var(--text-dim);margin-top:.6rem;line-height:1.6;font-family:var(--sans);font-weight:300}
+
+    /* ── Footer ── */
+    footer{border-top:1px solid var(--border);padding:.8rem 2rem;display:flex;gap:1.5rem;flex-wrap:wrap;justify-content:space-between;align-items:center}
+    .legend{display:flex;gap:1.2rem;align-items:center;flex-wrap:wrap}
+    .legend-item{display:flex;align-items:center;gap:.35rem;font-size:.59rem;letter-spacing:.13em;text-transform:uppercase;color:var(--text-dim)}
+    .legend-dot{width:7px;height:7px;border-radius:1px}
+    .footer-note{font-size:.58rem;color:var(--text-dim);font-family:var(--sans);letter-spacing:.03em}
+    .footer-click{font-size:.58rem;color:var(--blue);font-family:var(--sans);letter-spacing:.06em;opacity:.8}
+
+    /* ── Modal ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1000;display:flex;align-items:center;justify-content:center;padding:1.5rem;opacity:0;pointer-events:none;transition:opacity .22s}
+    .modal-overlay.open{opacity:1;pointer-events:auto}
+    .modal{background:#0d1218;border:1px solid var(--border2);max-width:600px;width:100%;max-height:90vh;overflow-y:auto;padding:1.8rem;position:relative;transform:translateY(12px);transition:transform .22s}
+    .modal-overlay.open .modal{transform:translateY(0)}
+    .modal::-webkit-scrollbar{width:4px}.modal::-webkit-scrollbar-track{background:var(--border)}.modal::-webkit-scrollbar-thumb{background:var(--border2)}
+    .modal-close{position:absolute;top:.9rem;right:.9rem;background:none;border:none;color:var(--text-dim);font-size:1.1rem;cursor:pointer;padding:.2rem .4rem;line-height:1}
+    .modal-close:hover{color:var(--text-bright)}
+    .modal-indicator-name{font-family:var(--sans);font-size:.75rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text-bright);margin-bottom:.2rem}
+    .modal-aspect{font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim);margin-bottom:1.2rem}
+    .modal-section{font-size:.59rem;letter-spacing:.22em;text-transform:uppercase;color:var(--text-dim);margin-bottom:.55rem;border-bottom:1px solid var(--border);padding-bottom:.35rem;margin-top:1.2rem}
+    .modal-desc{font-size:.71rem;line-height:1.72;color:var(--text);font-family:var(--sans);font-weight:300}
+    .threshold-table{width:100%;border-collapse:collapse}
+    .threshold-table td{padding:.45rem .55rem;font-size:.65rem;font-family:var(--sans);border-bottom:1px solid var(--border);line-height:1.5}
+    .threshold-table tr:last-child td{border-bottom:none}
+    .th-dot{width:8px;height:8px;border-radius:1px;display:inline-block;margin-right:.45rem;vertical-align:middle}
+
+    /* ── Chart inside modal ── */
+    .chart-wrap{position:relative;height:180px;margin-top:.5rem}
+    canvas.trend-chart{width:100%!important;height:100%!important}
+
+    /* ══════════════════════════════
+       INTRO PAGE
+    ══════════════════════════════ */
+    .intro-page{display:none;padding:2rem;max-width:860px;margin:0 auto 3rem}
+    .intro-page.active{display:block}
+    .intro-hero{margin-bottom:2.5rem}
+    .intro-hero h2{font-family:var(--sans);font-size:1.4rem;font-weight:600;color:var(--text-bright);margin-bottom:.9rem;letter-spacing:.04em}
+    .intro-hero p{font-family:var(--sans);font-size:.87rem;line-height:1.85;color:var(--text);margin-bottom:.9rem;font-weight:300}
+    .intro-hero p strong{color:var(--text-bright);font-weight:500}
+    .intro-section-title{font-family:var(--sans);font-size:.62rem;letter-spacing:.3em;text-transform:uppercase;color:var(--text-dim);margin-bottom:1rem;padding-bottom:.4rem;border-bottom:1px solid var(--border)}
+    .intro-callout{background:rgba(74,158,255,.06);border:1px solid var(--blue-dim);border-left:3px solid var(--blue);padding:1rem 1.3rem;margin:1.5rem 0;font-family:var(--sans);font-size:.82rem;line-height:1.8;color:var(--text);font-weight:300}
+    .intro-callout strong{color:var(--blue);font-weight:500}
+    .indicator-list{list-style:none;display:flex;flex-direction:column;gap:0}
+    .indicator-item{border-bottom:1px solid var(--border);padding:1rem 0}
+    .indicator-item:last-child{border-bottom:none}
+    .indicator-item-header{display:flex;align-items:baseline;gap:.8rem;margin-bottom:.35rem}
+    .indicator-item-name{font-family:var(--sans);font-size:.78rem;font-weight:600;color:var(--text-bright)}
+    .indicator-item-cat{font-size:.58rem;letter-spacing:.2em;text-transform:uppercase;color:var(--text-dim)}
+    .indicator-item-desc{font-family:var(--sans);font-size:.78rem;line-height:1.75;color:var(--text);font-weight:300}
+    .indicator-item-desc strong{color:var(--yellow);font-weight:500}
+
+    /* data tab wrapper */
+    .data-page{display:none}
+    .data-page.active{display:block}
+
+    @media(max-width:680px){
+      header,.summary,footer{padding-left:1rem;padding-right:1rem}
+      .grid{margin:0 0 1rem;border-left:none;border-right:none}
+      .tabs-bar{padding:0 1rem}
+      .intro-page{padding:1.2rem}
+      .card-value{font-size:1.4rem}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="site-title">Recession Indicators Dashboard</span>
+  <div class="pulse-wrap">
+    <div class="pulse"></div>
+    <span style="color:var(--red)" id="header-signal">Elevated Risk</span>
+  </div>
+</header>
+
+<div class="tabs-bar" id="tabs-bar">
+  <button class="tab-btn intro-tab active" data-view="intro">Introduction</button>
+  <button class="tab-btn" data-period="0">Q1 2023 · 03/31/23</button>
+  <button class="tab-btn" data-period="1">Q3 2023 · 09/30/23</button>
+  <button class="tab-btn" data-period="2">Q1 2024 · 03/31/24</button>
+  <button class="tab-btn" data-period="3">Q3 2024 · 09/30/24</button>
+  <button class="tab-btn" data-period="4">Q1 2025 · 03/31/25</button>
+  <button class="tab-btn" data-period="5">Q3 2025 · 09/30/25</button>
+  <button class="tab-btn" data-period="6">Q1 2026 · 03/31/26</button>
+</div>
+
+<!-- ══ INTRO PAGE ══ -->
+<div class="intro-page active" id="intro-page">
+  <div class="intro-hero">
+    <h2>What is a Recession — and Why Does it Matter?</h2>
+    <p>A <strong>recession</strong> is a significant, widespread, and prolonged downturn in economic activity. In simple terms, it's when the economy shrinks rather than grows. The most common rule of thumb is two consecutive quarters of negative GDP growth, though the official arbiter in the U.S. — the National Bureau of Economic Research (NBER) — looks at a broader set of factors including employment, income, spending, and industrial production.</p>
+    <p>During a recession, <strong>businesses earn less and cut costs</strong>, which usually means layoffs. <strong>Unemployment rises</strong>, consumers spend less, and companies invest less. This creates a feedback loop: less spending leads to lower business revenue, which leads to more job cuts, which leads to even less spending. Stock markets typically fall sharply, housing markets cool, and credit becomes harder to get.</p>
+    <p>The pain isn't spread evenly. <strong>Lower-income households</strong> feel recessions most acutely — they're more likely to lose jobs, have less savings to cushion the blow, and spend a greater share of income on necessities whose prices tend to stay high even as wages fall.</p>
+  </div>
+
+  <div class="intro-callout">
+    <strong>Why are recessions so hard to predict?</strong><br>
+    The economy is extraordinarily complex — millions of people, companies, and governments making decisions simultaneously based on expectations about the future. Economic indicators are published with a delay (sometimes weeks or months after the fact), revised after the fact, and can send conflicting signals. Even the world's best economists and central banks have repeatedly failed to predict recessions in advance. Most recessions are only officially confirmed <em>after</em> they've already begun. This dashboard tracks a basket of the most reliable leading and coincident indicators to give a clearer overall picture — no single number tells the whole story.
+  </div>
+
+  <div style="margin-top:2rem">
+    <div class="intro-section-title">The indicators — explained in plain English</div>
+    <ul class="indicator-list">
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">Yield Curve (10-Year minus 2-Year Treasury)</span>
+          <span class="indicator-item-cat">Growth Expectations</span>
+        </div>
+        <div class="indicator-item-desc">Think of U.S. Treasury bonds as loans to the government. Normally, lending money for 10 years pays more interest than lending for 2 years — you're taking on more risk over a longer time. When that flips (called an <strong>"inversion"</strong>) and short-term rates are higher than long-term rates, it means the bond market is betting that the economy will weaken and the Federal Reserve will be forced to cut rates in the future. Every U.S. recession since 1970 was preceded by an inversion.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">Core PCE Inflation</span>
+          <span class="indicator-item-cat">Inflation</span>
+        </div>
+        <div class="indicator-item-desc">This measures how fast prices are rising for everyday goods and services, <em>excluding</em> food and energy (which are volatile). It's the Federal Reserve's preferred inflation gauge. When inflation is too high, the Fed raises interest rates to cool things down — but <strong>high rates also slow growth</strong> and can tip the economy into recession. Core PCE above ~3% ties the Fed's hands, preventing it from cutting rates to soften a slowdown.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">Corporate Bond Spread vs. Treasury</span>
+          <span class="indicator-item-cat">Credit Conditions</span>
+        </div>
+        <div class="indicator-item-desc">Companies borrow money by issuing bonds. The extra interest they pay above what the government pays is called the "spread" — it reflects how risky investors think it is to lend to businesses. When spreads <strong>widen sharply</strong>, it means investors are worried about companies defaulting, credit gets more expensive, and businesses pull back on investment and hiring. It's a real-time fear gauge for the corporate sector.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">SLOOS — Senior Loan Officer Survey</span>
+          <span class="indicator-item-cat">Banking Sector</span>
+        </div>
+        <div class="indicator-item-desc">Every quarter the Federal Reserve asks bank loan officers whether they're making it <em>easier or harder</em> to get a loan. When banks tighten standards — requiring better credit scores, more collateral, or simply saying "no" more often — <strong>businesses and consumers can borrow less</strong>. Less borrowing means less investment, fewer hires, and slower growth. Tighter lending has historically been one of the clearest recession warning signs.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">ISM Manufacturing PMI</span>
+          <span class="indicator-item-cat">Business Activity</span>
+        </div>
+        <div class="indicator-item-desc">Each month, the Institute for Supply Management surveys hundreds of purchasing managers at manufacturing companies and asks: is business getting better or worse? The result is a single number — above 50 means expansion, below 50 means contraction. Because purchasing managers are ordering materials and planning production weeks in advance, this is a <strong>leading indicator</strong> — it often moves before the broader economy does.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">Housing Starts</span>
+          <span class="indicator-item-cat">Housing Market</span>
+        </div>
+        <div class="indicator-item-desc">This counts how many new homes began construction in a given month. Housing is one of the most interest-rate-sensitive parts of the economy — when rates rise, mortgages get more expensive, fewer people can buy homes, and builders stop building. A <strong>sharp sustained drop in housing starts</strong> is a reliable early warning sign because it signals both that consumers are pulling back on big purchases and that construction employment is about to fall.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">Sahm Rule</span>
+          <span class="indicator-item-cat">Labor Market</span>
+        </div>
+        <div class="indicator-item-desc">Created by economist Claudia Sahm, this rule says: if the 3-month average unemployment rate rises by 0.5 percentage points or more from its lowest point in the past year, a recession has almost certainly already begun. It's not a predictor — it's a <strong>real-time detector</strong>. The logic is simple: once unemployment starts rising meaningfully, layoffs tend to cascade. It has triggered in every U.S. recession since 1950.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">Weekly Jobless Claims</span>
+          <span class="indicator-item-cat">Labor Market</span>
+        </div>
+        <div class="indicator-item-desc">Every week, the government counts how many people filed for unemployment benefits for the first time. It's the most current labor market data available — just a week old. When this number <strong>starts climbing steadily</strong>, it means employers are cutting workers. Low readings (under 250K) indicate a healthy job market; sustained readings above 300K–350K are associated with recessions.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">UMich Consumer Sentiment</span>
+          <span class="indicator-item-cat">Consumer Confidence</span>
+        </div>
+        <div class="indicator-item-desc">The University of Michigan surveys around 500 households each month and asks how they feel about their personal finances and the economy. Since <strong>consumer spending accounts for about 70% of U.S. GDP</strong>, when people feel bad about the future, they tend to spend less — and that reduced spending can itself cause a recession. It's both a reflection of conditions and a driver of them.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">Real Personal Income Excluding Transfers</span>
+          <span class="indicator-item-cat">Consumer Confidence</span>
+        </div>
+        <div class="indicator-item-desc">This tracks how much money people are actually taking home from work (wages and salaries), adjusted for inflation, and <em>excluding</em> government benefits like Social Security. Stripping out transfers gives a cleaner read on whether people's earned purchasing power is genuinely growing. <strong>Sustained declines</strong> in this measure are one of the primary criteria the NBER uses to officially date recessions.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">S&P 500</span>
+          <span class="indicator-item-cat">Stock Market</span>
+        </div>
+        <div class="indicator-item-desc">The S&P 500 tracks the 500 largest U.S. companies. Stock prices are <strong>forward-looking</strong> — investors are constantly betting on what profits will look like months or years from now. A sustained drop of 20% or more (a "bear market") often signals that professional investors expect earnings and the economy to deteriorate significantly. However, stocks can also fall without a recession following, so this indicator is best read alongside the others.</div>
+      </li>
+      <li class="indicator-item">
+        <div class="indicator-item-header">
+          <span class="indicator-item-name">Russell 2000</span>
+          <span class="indicator-item-cat">Stock Market</span>
+        </div>
+        <div class="indicator-item-desc">The Russell 2000 tracks 2,000 smaller U.S. companies. Small businesses are more exposed to domestic economic conditions and rely more heavily on bank loans to operate. When the Russell 2000 <strong>significantly underperforms</strong> the S&P 500, it often signals that credit is tightening or domestic growth is weakening — risks that tend to hit smaller companies before large multinationals.</div>
+      </li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══ DATA PAGE ══ -->
+<div class="data-page" id="data-page">
+  <div class="summary" id="summary-bar">
+    <div class="summary-item">
+      <span class="summary-label">Period</span>
+      <span class="summary-val" id="sum-period">—</span>
+    </div>
+    <div class="summary-div"></div>
+    <div class="summary-item">
+      <span class="summary-label">Overall Signal</span>
+      <span class="summary-val" id="sum-signal">—</span>
+    </div>
+    <div class="summary-div"></div>
+    <div class="summary-item">
+      <span class="summary-label">Key Concerns</span>
+      <ul class="summary-concerns" id="sum-concerns"></ul>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<footer>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Recessionary</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--yellow)"></div>Cautionary</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>Healthy</div>
+  </div>
+  <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap">
+    <span class="footer-click" id="footer-click" style="display:none">↗ Click any card to see thresholds & trend chart</span>
+    <span class="footer-note" id="footer-note">Sources: FRED · BEA · ISM · UMich · Federal Reserve · S&P Global</span>
+  </div>
+</footer>
+
+<!-- ══ MODAL ══ -->
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <button class="modal-close" id="modal-close">✕</button>
+    <div class="modal-indicator-name" id="modal-name"></div>
+    <div class="modal-aspect" id="modal-aspect"></div>
+    <div class="modal-section">What it measures</div>
+    <div class="modal-desc" id="modal-desc"></div>
+    <div class="modal-section">Historical trend</div>
+    <div class="chart-wrap"><canvas id="trend-canvas"></canvas></div>
+    <div class="modal-section">Signal thresholds</div>
+    <table class="threshold-table" id="modal-thresholds"></table>
+  </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+/* ─────────────────────────────────────────────
+   DATA
+───────────────────────────────────────────── */
+const PERIOD_LABELS = ['Mar\'23','Sep\'23','Mar\'24','Sep\'24','Mar\'25','Sep\'25','Mar\'26'];
+
+// Trend data: one value per period, null if not available
+const TREND = {
+  "Yield Curve":                  [-58,-69,-38,-15,-26,8,35],
+  "Core PCE":                     [4.6,3.9,2.8,2.7,2.8,2.7,2.6],
+  "Corp Bond vs UST Spread":      [150,130,93,87,105,82,90],
+  "SLOOS (C&I Loans)":            [46,51,15,8,12,5,3],
+  "ISM Mfg. PMI":                 [46.3,49.0,50.3,47.2,49.0,50.2,52.7],
+  "Housing Starts":               [1.45,1.28,1.52,1.35,1.50,1.36,1.32],
+  "Sahm Rule":                    [0.00,0.00,0.00,0.35,0.28,0.13,0.20],
+  "Weekly Jobless Claims":        [198,204,210,225,224,218,215],
+  "UMich Consumer Sentiment":     [62.0,67.9,79.4,70.1,57.0,69.7,53.3],
+  "Real Personal Income ex-Transfers": [0.0,0.4,0.4,0.3,0.2,0.4,0.1],
+  "S&P 500":                      [3971,4288,5254,5762,5611,6021,7023],
+  "Russell 2000":                 [1802,1786,2050,2230,2004,2202,2197],
+};
+
+const TREND_LABEL = {
+  "Yield Curve":"bps","Core PCE":"%","Corp Bond vs UST Spread":"bps",
+  "SLOOS (C&I Loans)":"%","ISM Mfg. PMI":"index","Housing Starts":"M ann.",
+  "Sahm Rule":"ppt","Weekly Jobless Claims":"K","UMich Consumer Sentiment":"index",
+  "Real Personal Income ex-Transfers":"% MoM","S&P 500":"index","Russell 2000":"index"
+};
+
+// Threshold reference lines for chart
+const THRESHOLD_LINES = {
+  "Yield Curve":          [{v:-10,label:'Inversion threshold',color:'rgba(232,64,64,.4)'},{v:0,label:'Zero',color:'rgba(200,200,200,.2)'}],
+  "Core PCE":             [{v:2,label:'Fed target 2%',color:'rgba(46,204,113,.4)'},{v:3.5,label:'Cautionary 3.5%',color:'rgba(212,160,23,.4)'}],
+  "Corp Bond vs UST Spread":[{v:120,label:'Cautionary 120bps',color:'rgba(212,160,23,.4)'},{v:200,label:'Recessionary 200bps',color:'rgba(232,64,64,.4)'}],
+  "SLOOS (C&I Loans)":    [{v:25,label:'Cautionary 25%',color:'rgba(212,160,23,.4)'}],
+  "ISM Mfg. PMI":         [{v:50,label:'Expansion/contraction 50',color:'rgba(200,200,200,.25)'},{v:48.7,label:'GDP contraction ~48.7',color:'rgba(232,64,64,.3)'}],
+  "Housing Starts":       [{v:1.4,label:'Healthy 1.4M',color:'rgba(46,204,113,.4)'},{v:1.1,label:'Recessionary 1.1M',color:'rgba(232,64,64,.4)'}],
+  "Sahm Rule":            [{v:0.5,label:'Trigger 0.50ppt',color:'rgba(232,64,64,.5)'},{v:0.2,label:'Cautionary 0.20ppt',color:'rgba(212,160,23,.4)'}],
+  "Weekly Jobless Claims":[{v:250,label:'Cautionary 250K',color:'rgba(212,160,23,.4)'},{v:350,label:'Recessionary 350K',color:'rgba(232,64,64,.4)'}],
+  "UMich Consumer Sentiment":[{v:80,label:'Healthy >80',color:'rgba(46,204,113,.4)'},{v:60,label:'Cautionary 60',color:'rgba(212,160,23,.4)'}],
+  "Real Personal Income ex-Transfers":[{v:0,label:'Zero growth',color:'rgba(212,160,23,.3)'}],
+  "S&P 500":              [],
+  "Russell 2000":         [],
+};
+
+const DEFINITIONS = {
+  "Yield Curve":{desc:"The 10-year minus 2-year U.S. Treasury yield spread. When short-term yields exceed long-term yields (inversion), bond markets are signaling that the Fed will be forced to cut rates due to future economic weakness. Every U.S. recession since 1970 was preceded by an inversion, with a lead time of 6–24 months.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Spread above +10 bps — normal upward-sloping curve; bond markets pricing in growth."},{color:"var(--yellow)",label:"Cautionary",text:"Spread between −10 and +10 bps — flat curve; elevated uncertainty about near-term growth."},{color:"var(--red)",label:"Recessionary",text:"Spread below −10 bps (inverted) — a reliable recession leading indicator; deeper and longer inversions increase risk."}]},
+  "Core PCE":{desc:"Core Personal Consumption Expenditures price index, excluding food and energy. The Federal Reserve's preferred inflation gauge. When core PCE is well above the 2% target, the Fed cannot cut rates in response to economic weakness without risking a re-acceleration of inflation, increasing hard-landing risk.",thresholds:[{color:"var(--green)",label:"Healthy",text:"YoY below 2.5% — near the Fed's 2% target; gives the Fed room to support growth if needed."},{color:"var(--yellow)",label:"Cautionary",text:"YoY between 2.5% and 3.5% — above target but moderating; Fed policy remains constrained."},{color:"var(--red)",label:"Recessionary",text:"YoY above 3.5% — significantly above target; forces the Fed to maintain restrictive policy, raising hard-landing risk."}]},
+  "Corp Bond vs UST Spread":{desc:"The option-adjusted spread (OAS) of investment-grade corporate bonds versus comparable U.S. Treasury yields (ICE BofA IG Corporate Index). A wider spread reflects greater perceived credit risk. Spreads widen sharply when recession fears mount and investors demand higher compensation for holding corporate debt.",thresholds:[{color:"var(--green)",label:"Healthy",text:"OAS below 120 bps — credit markets calm; companies borrowing at near-normal rates."},{color:"var(--yellow)",label:"Cautionary",text:"OAS between 120–200 bps — some stress; rising concern about corporate credit quality."},{color:"var(--red)",label:"Recessionary",text:"OAS above 200 bps — significant credit stress; historically associated with recession or financial disruption."}]},
+  "SLOOS (C&I Loans)":{desc:"The Federal Reserve's Senior Loan Officer Opinion Survey measures the net percentage of banks tightening lending standards for Commercial & Industrial (C&I) loans. Tighter credit conditions reduce business investment and consumer spending. The SLOOS has historically anticipated recessions and is closely monitored by the Fed.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Net tightening below 10% — most banks maintaining or easing standards; credit readily available."},{color:"var(--yellow)",label:"Cautionary",text:"Net tightening 10–25% — moderate tightening; some headwind to credit growth."},{color:"var(--red)",label:"Recessionary",text:"Net tightening above 25% — readings above 30–40% have historically coincided with or preceded recessions."}]},
+  "ISM Mfg. PMI":{desc:"The Institute for Supply Management's Manufacturing Purchasing Managers' Index. Based on surveys of purchasing executives across 18 industries covering new orders, production, employment, supplier deliveries, and inventories. Above 50 signals expansion, below 50 contraction. One of the most timely leading indicators of the broader economy.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Above 52 — manufacturing expanding; historically associated with positive GDP growth."},{color:"var(--yellow)",label:"Cautionary",text:"Between 48.7 and 52 — neutral signal; modest contraction to modest expansion."},{color:"var(--red)",label:"Recessionary",text:"Below 48.7 for multiple months — sustained contraction consistent with broader GDP contraction. Below 45 is severe."}]},
+  "Housing Starts":{desc:"The annualized number of new residential construction projects begun in a given month (Census Bureau/HUD). Housing is one of the most interest-rate-sensitive sectors of the economy. A significant and sustained decline in starts is a reliable leading indicator of broader economic weakness.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Above 1.4M annualized — healthy construction activity consistent with a growing economy."},{color:"var(--yellow)",label:"Cautionary",text:"Between 1.1M and 1.4M — slowing starts; mortgage rates or weak demand weighing on construction."},{color:"var(--red)",label:"Recessionary",text:"Below 1.1M annualized — sharp contraction; readings this low have historically coincided with recessions."}]},
+  "Sahm Rule":{desc:"Created by economist Claudia Sahm, this indicator signals recession onset when the three-month moving average of the national unemployment rate (U3) rises 0.50 percentage points or more above its 12-month low. It has triggered in every U.S. recession since 1950.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Reading below 0.20 ppt — unemployment stable or declining; no recessionary pressure in labor market."},{color:"var(--yellow)",label:"Cautionary",text:"Reading between 0.20 and 0.50 ppt — labor market showing stress; approaching trigger level."},{color:"var(--red)",label:"Recessionary",text:"Reading at or above 0.50 ppt — rule triggered; historically signals recession is already underway."}]},
+  "Weekly Jobless Claims":{desc:"Initial unemployment insurance claims filed each week (Department of Labor). One of the most timely labor market indicators, published weekly. A sustained uptrend indicates employers are beginning to lay off workers, which typically precedes a broader increase in unemployment and consumer spending pullback.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Below 250K — low claims; labor market tight and employers retaining workers."},{color:"var(--yellow)",label:"Cautionary",text:"Between 250K and 350K — rising claims; early signs of labor market softening."},{color:"var(--red)",label:"Recessionary",text:"Above 350K — elevated claims consistent with recession or significant labor market deterioration."}]},
+  "UMich Consumer Sentiment":{desc:"The University of Michigan's Index of Consumer Sentiment, based on monthly surveys measuring consumers' views of personal finances, business conditions, and buying intentions. Consumer spending represents ~70% of U.S. GDP, so sustained pessimism can become a self-fulfilling driver of economic slowdown.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Above 80 — consumers broadly optimistic about finances and economic outlook."},{color:"var(--yellow)",label:"Cautionary",text:"Between 60 and 80 — sentiment depressed; consumers cautious; spending headwinds possible."},{color:"var(--red)",label:"Recessionary",text:"Below 60 — deeply pessimistic; historically consistent with recession or near-recession conditions. All-time low was 50.0 (June 2022)."}]},
+  "Real Personal Income ex-Transfers":{desc:"Inflation-adjusted personal income excluding government transfer payments (BEA). By stripping out transfers like Social Security and unemployment benefits, this captures underlying earned income growth. It is one of the primary indicators the NBER uses to determine official recession dates.",thresholds:[{color:"var(--green)",label:"Healthy",text:"MoM growth positive; YoY above 1.5% — real wages keeping pace with or outpacing inflation."},{color:"var(--yellow)",label:"Cautionary",text:"Flat to slightly positive MoM; YoY 0–1.5% — income barely offsetting inflation; consumer pressure building."},{color:"var(--red)",label:"Recessionary",text:"MoM negative for 2+ months; sustained YoY decline — NBER uses this as a primary recession dating criterion."}]},
+  "S&P 500":{desc:"The S&P 500 tracks 500 large U.S. companies and is the most widely followed equity benchmark. Stock markets are forward-looking — a sustained bear market (≥20% decline from peak) often signals that investors expect significant deterioration in corporate earnings and economic activity.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Near all-time highs or in bull market — markets pricing in continued growth and earnings expansion."},{color:"var(--yellow)",label:"Cautionary",text:"Correction (−10% to −20% from recent peak) — investor uncertainty; potential early warning of economic slowdown."},{color:"var(--red)",label:"Recessionary",text:"Bear market (−20%+ from peak) — historically coincides with or slightly leads recession; 7 of last 9 bear markets accompanied a recession."}]},
+  "Russell 2000":{desc:"The Russell 2000 tracks 2,000 small-cap U.S. companies. Small caps are more sensitive to domestic economic conditions and interest rates than large-cap multinationals. Because small companies rely more heavily on bank financing, the Russell 2000 often leads the S&P 500 as a recession signal.",thresholds:[{color:"var(--green)",label:"Healthy",text:"Near recent highs; outperforming or in line with large-caps — small business conditions healthy; credit accessible."},{color:"var(--yellow)",label:"Cautionary",text:"Underperforming large-caps significantly or in correction — small business stress; tighter credit conditions showing."},{color:"var(--red)",label:"Recessionary",text:"In bear market (−20%+) or significantly lagging large-caps for extended period — small-cap weakness historically precedes broad recession."}]},
+};
+
+const PERIODS = [
+  {
+    label:"Q1 2023 — 03/31/2023",signal:"6/12 indicators cautionary or recessionary",
+    concerns:["Yield curve at deepest inversion since 1981, signaling recession risk","Credit conditions tightening sharply — SLOOS at near-recession levels","Manufacturing PMI at 5th consecutive month of contraction"],
+    footerNote:"Q1 2023: BEA data reflects Feb 2023 (released 3/31/23). Sources: FRED · BEA · ISM · UMich · Federal Reserve.",
+    indicators:[
+      {name:"Yield Curve",aspect:"Growth Expectations",value:"−58",unit:"bps (10Y−2Y)",status:"red",tag:"Inverted",fill:88,note:"Deepest inversion since 1981. Every recession since 1970 was preceded by a similar inversion."},
+      {name:"Core PCE",aspect:"Inflation",value:"4.6%",unit:"YoY (Feb 2023)",status:"red",tag:"Well above target",fill:80,note:"Far above the Fed's 2% target. Prevents the Fed from cutting rates to soften any slowdown."},
+      {name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",value:"150",unit:"bps IG OAS",status:"yellow",tag:"Elevated",fill:50,note:"SVB/Signature Bank stress contributed to spread widening. Elevated above 2021 lows of ~80 bps."},
+      {name:"SLOOS (C&I Loans)",aspect:"Banking Sector",value:"46%",unit:"net tightening",status:"red",tag:"Tightening",fill:82,note:"~46% net share of banks tightened C&I lending standards — among the highest readings outside a formal recession."},
+      {name:"ISM Mfg. PMI",aspect:"Business Activity",value:"46.3",unit:"index",status:"red",tag:"Contraction",fill:75,note:"5th consecutive month of contraction. Lowest reading since May 2020. Below 48.7 signals broader GDP contraction."},
+      {name:"Housing Starts",aspect:"Housing Market",value:"1.45M",unit:"ann. (Jan 2023)",status:"yellow",tag:"Moderating",fill:48,note:"Down from 2022 peaks due to rapidly rising mortgage rates. 30-year fixed mortgage above 6.5%."},
+      {name:"Sahm Rule",aspect:"Labor Market",value:"0.00",unit:"ppt above 12-mo low",status:"green",tag:"Not triggered",fill:5,note:"Unemployment at cycle low of 3.5% as of Feb 2023. Sahm Rule not triggered. Labor market still resilient."},
+      {name:"Weekly Jobless Claims",aspect:"Labor Market",value:"198K",unit:"initial claims",status:"green",tag:"Low",fill:15,note:"Week ending 3/25/2023. Well below the 250–300K+ range historically associated with deteriorating labor markets."},
+      {name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"62.0",unit:"index (1966=100)",status:"yellow",tag:"Depressed",fill:55,note:"Final March 2023 reading. Down from 67.0 in February. Below 70 correlates with elevated recession risk."},
+      {name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.0%",unit:"MoM (Feb 2023)",status:"yellow",tag:"Stalling",fill:42,note:"Essentially flat in February 2023. Sustained declines are a primary NBER recession dating criterion."},
+      {name:"S&P 500",aspect:"Stock Market",value:"3,971",unit:"index close",status:"yellow",tag:"Off peak",fill:45,note:"S&P 500 closed 3/31/2023. Still ~15% below Jan 2022 all-time high of ~4,818, but recovering from 2022 lows."},
+      {name:"Russell 2000",aspect:"Stock Market",value:"1,802",unit:"index close",status:"yellow",tag:"Lagging",fill:50,note:"Significantly underperforming the S&P 500 YTD, reflecting small-cap sensitivity to credit tightening."},
+    ]
+  },
+  {
+    label:"Q3 2023 — 09/30/2023",signal:"5/12 indicators cautionary or recessionary",
+    concerns:["Yield curve deepening inversion to −69 bps on 'higher for longer' Fed rates","SLOOS tightening accelerating to 51% following regional banking stress","Housing starts falling to 1.28M as 30-year mortgage rates surpass 7.5%"],
+    footerNote:"Q3 2023: Core PCE reflects Aug 2023 data (released 9/29/23). Sources: FRED · BEA · ISM · UMich · Federal Reserve.",
+    indicators:[
+      {name:"Yield Curve",aspect:"Growth Expectations",value:"−69",unit:"bps (10Y−2Y)",status:"red",tag:"Deeper inversion",fill:92,note:"Inversion deepened further to −69 bps as Fed held rates at 5.25–5.50%. Peak inversion of −108 bps reached in July 2023."},
+      {name:"Core PCE",aspect:"Inflation",value:"3.9%",unit:"YoY (Aug 2023)",status:"yellow",tag:"Easing slowly",fill:62,note:"Significant progress from 4.6% in March, but still well above the Fed's 2% target. The lowest since mid-2021."},
+      {name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",value:"130",unit:"bps IG OAS",status:"yellow",tag:"Moderately elevated",fill:44,note:"Spreads tightened from the March 2023 banking-crisis peak. Credit conditions improving but not yet fully normalized."},
+      {name:"SLOOS (C&I Loans)",aspect:"Banking Sector",value:"51%",unit:"net tightening",status:"red",tag:"Peak tightening",fill:88,note:"Q2 2023 SLOOS (most recent as of 9/30/23). Tightening intensified post-SVB. Near the highest peacetime reading on record."},
+      {name:"ISM Mfg. PMI",aspect:"Business Activity",value:"49.0",unit:"index",status:"yellow",tag:"Near flat",fill:42,note:"Improved from the 46.3 March low. 11th consecutive month of contraction, but approaching the expansion threshold."},
+      {name:"Housing Starts",aspect:"Housing Market",value:"1.28M",unit:"ann. (Aug 2023)",status:"yellow",tag:"Declining",fill:58,note:"Dropped sharply as 30-year mortgage rates surpassed 7.5% — the highest since 2000. Single-family starts under pressure."},
+      {name:"Sahm Rule",aspect:"Labor Market",value:"0.00",unit:"ppt above 12-mo low",status:"green",tag:"Not triggered",fill:5,note:"Unemployment remained near cycle lows. Labor market showed remarkable resilience despite aggressive Fed tightening."},
+      {name:"Weekly Jobless Claims",aspect:"Labor Market",value:"204K",unit:"initial claims",status:"green",tag:"Low",fill:18,note:"Week ending 9/23/2023. Historically low level. The labor market continued to defy recession fears throughout 2023."},
+      {name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"67.9",unit:"index (1966=100)",status:"yellow",tag:"Below average",fill:50,note:"Final September 2023 reading. Improved from the March low but still below the 70–80 level associated with a healthy economy."},
+      {name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.4%",unit:"MoM (Aug 2023)",status:"green",tag:"Growing",fill:28,note:"Real income ex-transfers growing as wage gains began to outpace moderating inflation. Consumer fundamentals improving."},
+      {name:"S&P 500",aspect:"Stock Market",value:"4,288",unit:"index close",status:"yellow",tag:"Off peak",fill:40,note:"S&P 500 closed 9/29/2023. Down 3.3% for Q3 as higher-for-longer rate fears resurfaced. Still up +13% YTD."},
+      {name:"Russell 2000",aspect:"Stock Market",value:"1,786",unit:"index close",status:"yellow",tag:"Lagging",fill:52,note:"Russell 2000 ended Q3 down 5.1%, underperforming large caps. Still in bear market territory from its Nov 2021 all-time high."},
+    ]
+  },
+  {
+    label:"Q1 2024 — 03/31/2024",signal:"3/12 indicators cautionary or recessionary",
+    concerns:["Yield curve still inverted at −38 bps despite Fed holding rates steady","Core PCE at 2.8% — progress made but still above the 2% target","Russell 2000 lagging S&P 500 by ~5ppts, reflecting higher-for-longer sensitivity"],
+    footerNote:"Q1 2024: BEA data reflects Feb 2024 (released 3/29/24). Sources: FRED · BEA · ISM · UMich · Federal Reserve.",
+    indicators:[
+      {name:"Yield Curve",aspect:"Growth Expectations",value:"−38",unit:"bps (10Y−2Y)",status:"red",tag:"Still inverted",fill:68,note:"Still inverted but less severe than −58 bps in Q1 2023. Inversion normalized from the −108 bps peak of July 2023."},
+      {name:"Core PCE",aspect:"Inflation",value:"2.8%",unit:"YoY (Feb 2024)",status:"yellow",tag:"Above target",fill:48,note:"Significant improvement from 4.6% in Feb 2023. Still above 2% target but disinflationary trend well established."},
+      {name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",value:"93",unit:"bps IG OAS",status:"green",tag:"Tight",fill:22,note:"Tightened dramatically from 150 bps in 2023 to ~93 bps — near the tightest levels since 2021. Credit stress fully eased."},
+      {name:"SLOOS (C&I Loans)",aspect:"Banking Sector",value:"15%",unit:"net tightening",status:"yellow",tag:"Easing",fill:28,note:"Q4 2023 SLOOS. Down sharply from 46–51% peak. Banks still cautious but notably less restrictive than peak tightening."},
+      {name:"ISM Mfg. PMI",aspect:"Business Activity",value:"50.3",unit:"index",status:"green",tag:"Expansion",fill:30,note:"First reading above 50 after 16 consecutive months of contraction. Manufacturing sector returned to expansion in March 2024."},
+      {name:"Housing Starts",aspect:"Housing Market",value:"1.52M",unit:"ann. (Feb 2024)",status:"green",tag:"Resilient",fill:35,note:"Surged to 1.52M — well above expectations of 1.43M and the highest since August 2023. Weather-related recovery."},
+      {name:"Sahm Rule",aspect:"Labor Market",value:"0.00",unit:"ppt above 12-mo low",status:"green",tag:"Not triggered",fill:5,note:"Unemployment at 3.9% in February 2024. Sahm Rule not triggered. Labor market remains in good health despite Fed tightening."},
+      {name:"Weekly Jobless Claims",aspect:"Labor Market",value:"210K",unit:"initial claims",status:"green",tag:"Low",fill:18,note:"Week ending 3/23/2024. Historically low. Labor market continued to confound recession expectations through Q1 2024."},
+      {name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"79.4",unit:"index (1966=100)",status:"green",tag:"Near 3-yr high",fill:28,note:"Final March 2024 reading. Highest since July 2021. Major improvement from 62.0 in March 2023 as inflation expectations fell."},
+      {name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.4%",unit:"MoM (Feb 2024)",status:"green",tag:"Growing",fill:25,note:"Growing solidly as wage gains outpaced moderating inflation. Consumer in a much stronger position than 12 months prior."},
+      {name:"S&P 500",aspect:"Stock Market",value:"5,254",unit:"index close",status:"green",tag:"All-time high",fill:15,note:"S&P 500 closed at a record high of 5,254.35 on 3/28/2024 — its 22nd new all-time high of 2024, up 10.2% for Q1 2024."},
+      {name:"Russell 2000",aspect:"Stock Market",value:"~2,050",unit:"index close",status:"yellow",tag:"Lagging",fill:42,note:"Russell 2000 up ~5% in Q1 2024 vs. +10.2% for S&P 500. Small caps underperforming — still sensitive to higher-for-longer rates."},
+    ]
+  },
+  {
+    label:"Q3 2024 — 09/30/2024",signal:"2/12 indicators cautionary or recessionary",
+    concerns:["Yield curve still mildly inverted at −15 bps as curve begins normalizing","Sahm Rule reading at 0.35, below trigger but showing labor market cooling","Housing starts at 1.35M, remaining below pre-rate-hike trend levels"],
+    footerNote:"Q3 2024: BEA data reflects Aug 2024 (released 9/27/24). Sources: FRED · BEA · ISM · UMich · Federal Reserve.",
+    indicators:[
+      {name:"Yield Curve",aspect:"Growth Expectations",value:"−15",unit:"bps (10Y−2Y)",status:"red",tag:"Normalizing",fill:38,note:"Inversion narrowing sharply toward zero as Fed began cutting rates (first cut: Sep 18, 2024 at −50bps). Un-inversion in sight."},
+      {name:"Core PCE",aspect:"Inflation",value:"2.7%",unit:"YoY (Aug 2024)",status:"yellow",tag:"Near target",fill:40,note:"Just 70 bps above the 2% target. Confidence building that inflation was largely tamed, enabling the Fed's September rate cut."},
+      {name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",value:"87",unit:"bps IG OAS",status:"green",tag:"Tight",fill:18,note:"Near the tightest level in years. Credit markets fully normalized — no sign of corporate financing stress."},
+      {name:"SLOOS (C&I Loans)",aspect:"Banking Sector",value:"8%",unit:"net tightening",status:"green",tag:"Largely neutral",fill:14,note:"Q2 2024 SLOOS. Very low net tightening — banks close to neutral. Dramatic improvement from the 51% peak in 2023."},
+      {name:"ISM Mfg. PMI",aspect:"Business Activity",value:"47.2",unit:"index",status:"yellow",tag:"Contraction",fill:55,note:"Dipped back below 50 in September 2024 after the brief expansion in Q1 2024. Manufacturing remained soft even as the broader economy grew."},
+      {name:"Housing Starts",aspect:"Housing Market",value:"1.35M",unit:"ann. (Aug 2024)",status:"yellow",tag:"Below trend",fill:50,note:"Mortgage rates remained above 6.5% despite Fed cuts, limiting housing activity. Single-family starts showed resilience; multifamily fell."},
+      {name:"Sahm Rule",aspect:"Labor Market",value:"0.35",unit:"ppt above 12-mo low",status:"yellow",tag:"Elevated",fill:62,note:"Unemployment had risen from 3.7% to 4.2%. Sahm Rule elevated but not yet triggered. Triggered in July 2024 briefly before reversing."},
+      {name:"Weekly Jobless Claims",aspect:"Labor Market",value:"225K",unit:"initial claims",status:"green",tag:"Slightly elevated",fill:28,note:"Week ending 9/21/2024. Rose from early-2024 lows but still well within a healthy range. No recession signal."},
+      {name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"70.1",unit:"index (1966=100)",status:"yellow",tag:"Below average",fill:45,note:"Final September 2024 reading. Improved from Q1 lows but still below 80. Consumers cautious about lingering inflation despite rate cuts."},
+      {name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.3%",unit:"MoM (Aug 2024)",status:"green",tag:"Growing",fill:25,note:"Continued moderate growth. Real income supported by resilient wage gains as inflation further moderated."},
+      {name:"S&P 500",aspect:"Stock Market",value:"5,762",unit:"index close",status:"green",tag:"All-time high",fill:12,note:"S&P 500 ended Q3 2024 at a record 5,762 — up 5.5% for Q3 and up 20.8% YTD, the best start through three quarters since 1997."},
+      {name:"Russell 2000",aspect:"Stock Market",value:"2,230",unit:"index close",status:"green",tag:"Strong Q3",fill:22,note:"Russell 2000 gained 8.9% in Q3 2024, outperforming large caps as rate-cut expectations boosted small-cap sentiment."},
+    ]
+  },
+  {
+    label:"Q1 2025 — 03/31/2025",signal:"5/12 indicators cautionary or recessionary",
+    concerns:["UMich consumer sentiment collapsed to 57.0 amid tariff and policy uncertainty","S&P 500 down 4.6% YTD as AI tech rally stalled and trade war fears mounted","ISM PMI fell back to 49.0 — back in contraction after brief 2024 expansion"],
+    footerNote:"Q1 2025: BEA data reflects Feb 2025 (released 3/28/25). Sources: FRED · BEA · ISM · UMich · Federal Reserve.",
+    indicators:[
+      {name:"Yield Curve",aspect:"Growth Expectations",value:"−26",unit:"bps (10Y−2Y)",status:"red",tag:"Re-inverted",fill:52,note:"Curve had briefly un-inverted in late 2024, then re-inverted mildly in Q1 2025 as growth concerns resurfaced amid tariff uncertainty."},
+      {name:"Core PCE",aspect:"Inflation",value:"2.8%",unit:"YoY (Feb 2025)",status:"yellow",tag:"Above target",fill:48,note:"Inflation progress stalled at 2.8% — same as Feb 2024. Tariff fears created upside inflation risk, complicating Fed's path."},
+      {name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",value:"105",unit:"bps IG OAS",status:"green",tag:"Slightly wider",fill:26,note:"Spreads widened modestly from 2024 lows as trade war uncertainty increased. Still well within a healthy historical range."},
+      {name:"SLOOS (C&I Loans)",aspect:"Banking Sector",value:"12%",unit:"net tightening",status:"yellow",tag:"Mildly tightening",fill:22,note:"Q4 2024 SLOOS. Modest uptick in tightening from the 8% Q2 2024 reading. Banks becoming slightly more cautious on policy uncertainty."},
+      {name:"ISM Mfg. PMI",aspect:"Business Activity",value:"49.0",unit:"index",status:"yellow",tag:"Back in contraction",fill:44,note:"Fell back to 49.0 in March 2025 after ISM had reached 50.3 in March 2024. Trade policy uncertainty disrupting manufacturing plans."},
+      {name:"Housing Starts",aspect:"Housing Market",value:"1.50M",unit:"ann. (Feb 2025)",status:"green",tag:"Resilient",fill:32,note:"Housing starts rebounded to 1.5M in February 2025 as mortgage rates fell from 2024 peaks, encouraging homebuilder activity."},
+      {name:"Sahm Rule",aspect:"Labor Market",value:"0.28",unit:"ppt above 12-mo low",status:"yellow",tag:"Elevated",fill:50,note:"Unemployment ticked back up to 4.1% in February 2025. Sahm Rule elevated at 0.28 but below the 0.50 trigger threshold."},
+      {name:"Weekly Jobless Claims",aspect:"Labor Market",value:"224K",unit:"initial claims",status:"green",tag:"Stable",fill:26,note:"Week ending 3/22/2025. Claims holding near stable levels despite policy uncertainty. Labor market not yet deteriorating."},
+      {name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"57.0",unit:"index (1966=100)",status:"red",tag:"Sharp decline",fill:70,note:"Final March 2025 reading. Plunged from 71.7 in January — the sharpest 2-month drop since 2008. Tariff and trade war fears dominated."},
+      {name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.2%",unit:"MoM (Feb 2025)",status:"yellow",tag:"Slowing",fill:38,note:"Growth slowing relative to 2024 pace. Real income growth just barely positive as wage gains moderated and uncertainty increased."},
+      {name:"S&P 500",aspect:"Stock Market",value:"5,611",unit:"index close",status:"yellow",tag:"Correction",fill:38,note:"S&P 500 on 3/31/2025 — down 4.6% YTD and ~8% from January 2025 all-time high. Tech selloff and tariff uncertainty drove the decline."},
+      {name:"Russell 2000",aspect:"Stock Market",value:"2,004",unit:"index close",status:"red",tag:"Underperforming",fill:58,note:"Russell 2000 down ~10% YTD by end of Q1 2025, underperforming large caps significantly as small caps hit harder by tariff and credit fears."},
+    ]
+  },
+  {
+    label:"Q3 2025 — 09/30/2025",signal:"2/12 indicators cautionary or recessionary",
+    concerns:["Core PCE still at 2.7% — inflation progress limited despite three rate cuts","Housing starts at 1.36M, still constrained by mortgage rates above 6%","UMich sentiment recovering but at 69.7, still below the 'healthy' 80 threshold"],
+    footerNote:"Q3 2025: BEA data reflects Aug 2025. Sources: FRED · BEA · ISM · UMich · Federal Reserve.",
+    indicators:[
+      {name:"Yield Curve",aspect:"Growth Expectations",value:"+8",unit:"bps (10Y−2Y)",status:"yellow",tag:"Normalizing",fill:25,note:"Yield curve returned to positive territory for the first time since late 2022 as the Fed's three rate cuts in H2 2025 pulled down short-term rates."},
+      {name:"Core PCE",aspect:"Inflation",value:"2.7%",unit:"YoY (Aug 2025)",status:"yellow",tag:"Near target",fill:38,note:"Inflation remained stubbornly near 2.7%. Fed cut rates three times in 2025 (Sep, Oct, Dec) but inflation progress remained limited."},
+      {name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",value:"82",unit:"bps IG OAS",status:"green",tag:"Tight",fill:16,note:"Credit spreads near cycle tights as the soft-landing narrative solidified and corporate earnings remained strong."},
+      {name:"SLOOS (C&I Loans)",aspect:"Banking Sector",value:"5%",unit:"net tightening",status:"green",tag:"Near neutral",fill:10,note:"Q2 2025 SLOOS. Banks nearly neutral on lending standards — the most accommodative reading since pre-rate-hike era."},
+      {name:"ISM Mfg. PMI",aspect:"Business Activity",value:"50.2",unit:"index",status:"green",tag:"Barely expanding",fill:32,note:"Manufacturing returned to modest expansion in September 2025 as rate cuts began to ease financing costs for capital investment."},
+      {name:"Housing Starts",aspect:"Housing Market",value:"1.36M",unit:"ann. (Aug 2025)",status:"yellow",tag:"Below trend",fill:48,note:"Housing starts constrained by mortgage rates still above 6%. Limited improvement despite Fed rate cuts as long-end rates stayed elevated."},
+      {name:"Sahm Rule",aspect:"Labor Market",value:"0.13",unit:"ppt above 12-mo low",status:"green",tag:"Easing",fill:22,note:"Unemployment stabilized near 4.2%. Sahm Rule reading declining as labor market fears from 2024 faded. No recession signal."},
+      {name:"Weekly Jobless Claims",aspect:"Labor Market",value:"218K",unit:"initial claims",status:"green",tag:"Low",fill:20,note:"Week ending 9/20/2025. Claims fell to historical lows as labor market remained resilient through the Fed's rate-cutting cycle."},
+      {name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"69.7",unit:"index (1966=100)",status:"yellow",tag:"Recovering",fill:45,note:"Recovered from the March 2025 low of 57.0 but still below 70. Consumers more optimistic as trade tensions eased and rate cuts materialized."},
+      {name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.4%",unit:"MoM (Aug 2025)",status:"green",tag:"Growing",fill:22,note:"Real income ex-transfers growing solidly as tight labor market supported wages while inflation remained moderate."},
+      {name:"S&P 500",aspect:"Stock Market",value:"6,021",unit:"index close",status:"green",tag:"All-time high",fill:12,note:"S&P 500 hit fresh all-time highs in Q3 2025, gaining 8.1% for the quarter. Strong earnings and Fed rate cuts drove the recovery from Q1 lows."},
+      {name:"Russell 2000",aspect:"Stock Market",value:"2,202",unit:"index close",status:"green",tag:"Strong Q3",fill:20,note:"Russell 2000 surged 12.4% in Q3 2025 — outpacing large caps — as Fed rate cuts boosted small-cap valuations and first all-time high since Nov 2021."},
+    ]
+  },
+  {
+    label:"Q1 2026 — 03/31/2026",signal:"2/12 indicators cautionary or recessionary",
+    concerns:["UMich consumer sentiment fell sharply to 53.3 — near all-time lows amid Iran conflict","Housing starts at 1.32M — constrained by mortgage rates remaining above 6.5%","Core PCE edging down to 2.6% but still above the Fed's 2% target"],
+    footerNote:"Q1 2026: BEA data reflects Feb 2026. Sources: FRED · BEA · ISM · UMich · Federal Reserve.",
+    indicators:[
+      {name:"Yield Curve",aspect:"Growth Expectations",value:"+35",unit:"bps (10Y−2Y)",status:"yellow",tag:"Positive, below avg",fill:28,note:"Curve fully normalized and positive. At +35 bps it is still well below the historical average of ~85 bps, suggesting ongoing structural uncertainty."},
+      {name:"Core PCE",aspect:"Inflation",value:"2.6%",unit:"YoY (Feb 2026)",status:"yellow",tag:"Near target",fill:35,note:"Core PCE edging toward the 2% target but progress has slowed. Oil price spike from Iran conflict creates upside inflation risk."},
+      {name:"Corp Bond vs UST Spread",aspect:"Credit Conditions",value:"90",unit:"bps IG OAS",status:"green",tag:"Tight",fill:18,note:"Credit spreads well-behaved despite geopolitical uncertainty. Corporate balance sheets remain healthy and default rates low."},
+      {name:"SLOOS (C&I Loans)",aspect:"Banking Sector",value:"3%",unit:"net tightening",status:"green",tag:"Neutral",fill:8,note:"Q4 2025 SLOOS. Banks nearly fully neutral — among the most accommodative readings since 2021. Credit readily available."},
+      {name:"ISM Mfg. PMI",aspect:"Business Activity",value:"52.7",unit:"index",status:"green",tag:"Expanding",fill:25,note:"Strongest manufacturing reading since August 2022. Stockpiling activity ahead of tariff uncertainty boosted new orders and production."},
+      {name:"Housing Starts",aspect:"Housing Market",value:"1.32M",unit:"ann. (Feb 2026)",status:"yellow",tag:"Constrained",fill:52,note:"Housing starts declined to 1.32M as mortgage rates stayed above 6.5%. Supply of existing homes improved, reducing pressure on new construction."},
+      {name:"Sahm Rule",aspect:"Labor Market",value:"0.20",unit:"ppt above 12-mo low",status:"yellow",tag:"Slightly elevated",fill:38,note:"Unemployment at 4.3% with Sahm Rule reading at 0.20 — right at the cautionary threshold but well below the 0.50 trigger level."},
+      {name:"Weekly Jobless Claims",aspect:"Labor Market",value:"215K",unit:"initial claims",status:"green",tag:"Low",fill:18,note:"Week ending 5/23/2026. Claims slightly above recent lows but still within historical norms. Labor market remains broadly healthy."},
+      {name:"UMich Consumer Sentiment",aspect:"Consumer Confidence",value:"53.3",unit:"index (1966=100)",status:"red",tag:"Near historic low",fill:75,note:"Final March 2026 reading. Plummeted as the Iran conflict began — interviews conducted post-conflict showed sharply lower sentiment. Near all-time lows."},
+      {name:"Real Personal Income ex-Transfers",aspect:"Consumer Confidence",value:"+0.1%",unit:"MoM (Feb 2026)",status:"yellow",tag:"Near flat",fill:40,note:"Real income ex-transfers nearly flat in February 2026 as nominal wage growth moderated and energy-driven inflation created a headwind."},
+      {name:"S&P 500",aspect:"Stock Market",value:"7,023",unit:"index close",status:"green",tag:"All-time high",fill:10,note:"S&P 500 hit 7,000 for the first time on April 15, 2026 — closing at 7,022.95. Strong corporate earnings and AI investment drove gains despite geopolitical risk."},
+      {name:"Russell 2000",aspect:"Stock Market",value:"~2,197",unit:"index close",status:"yellow",tag:"Lagging",fill:38,note:"Russell 2000 underperforming the S&P 500 in early 2026. Small caps more exposed to domestic uncertainty from Iran conflict and oil price spike."},
+    ]
+  }
+];
+
+/* ─────────────────────────────────────────────
+   CHART INSTANCE
+───────────────────────────────────────────── */
+let chartInstance = null;
+
+function buildTrendChart(indicatorName, highlightIdx) {
+  const ctx = document.getElementById('trend-canvas');
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  const vals = TREND[indicatorName];
+  const lines = THRESHOLD_LINES[indicatorName] || [];
+  const unit  = TREND_LABEL[indicatorName] || '';
+  const colors = vals.map((v,i) => i === highlightIdx ? '#4a9eff' : 'rgba(74,158,255,.45)');
+  const datasets = [{
+    label: indicatorName,
+    data: vals,
+    borderColor: '#4a9eff',
+    backgroundColor: 'rgba(74,158,255,.08)',
+    pointBackgroundColor: colors,
+    pointRadius: vals.map((_,i) => i === highlightIdx ? 6 : 3.5),
+    pointHoverRadius: 6,
+    borderWidth: 1.5,
+    tension: 0.3,
+    fill: true,
+  }];
+  // Add threshold annotations as extra datasets (dashed lines)
+  lines.forEach(l => {
+    datasets.push({
+      label: l.label,
+      data: Array(vals.length).fill(l.v),
+      borderColor: l.color,
+      borderWidth: 1,
+      borderDash: [4,4],
+      pointRadius: 0,
+      fill: false,
+    });
+  });
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels: PERIOD_LABELS, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 500 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0d1218', borderColor: '#263040', borderWidth: 1,
+          titleColor: '#eaf2fb', bodyColor: '#c8d4e0',
+          callbacks: { label: ctx => ` ${ctx.parsed.y} ${unit}` }
+        }
+      },
+      scales: {
+        x: { grid: { color: '#1e2530' }, ticks: { color: '#5a6878', font: { family: "'IBM Plex Mono'" , size: 9 } } },
+        y: { grid: { color: '#1e2530' }, ticks: { color: '#5a6878', font: { family: "'IBM Plex Mono'", size: 9 },
+          callback: v => v + (unit.length < 5 ? ' '+unit : '')
+        } }
+      }
+    }
+  });
+}
+
+/* ─────────────────────────────────────────────
+   MODAL
+───────────────────────────────────────────── */
+function openModal(indicatorName, aspect, periodIdx) {
+  const def = DEFINITIONS[indicatorName]; if (!def) return;
+  document.getElementById('modal-name').textContent = indicatorName;
+  document.getElementById('modal-aspect').textContent = aspect;
+  document.getElementById('modal-desc').textContent = def.desc;
+  const tbl = document.getElementById('modal-thresholds');
+  tbl.innerHTML = def.thresholds.map(t => `
+    <tr>
+      <td style="width:1px;white-space:nowrap">
+        <span class="th-dot" style="background:${t.color}"></span>
+        <span style="color:${t.color};font-weight:500">${t.label}</span>
+      </td>
+      <td style="color:var(--text-dim)">${t.text}</td>
+    </tr>`).join('');
+  document.getElementById('modal-overlay').classList.add('open');
+  // Build chart after overlay visible so canvas has dimensions
+  requestAnimationFrame(() => buildTrendChart(indicatorName, periodIdx));
+}
+
+document.getElementById('modal-close').addEventListener('click', () => { document.getElementById('modal-overlay').classList.remove('open'); });
+document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) document.getElementById('modal-overlay').classList.remove('open'); });
+
+/* ─────────────────────────────────────────────
+   RENDER PERIOD
+───────────────────────────────────────────── */
+let activePeriodIdx = null;
+
+function renderPeriod(idx) {
+  activePeriodIdx = idx;
+  const p = PERIODS[idx];
+  document.getElementById('intro-page').classList.remove('active');
+  document.getElementById('data-page').classList.add('active');
+  document.getElementById('footer-click').style.display = 'inline';
+  document.getElementById('sum-period').textContent = p.label;
+  document.getElementById('sum-signal').textContent = p.signal;
+  const ul = document.getElementById('sum-concerns');
+  ul.innerHTML = p.concerns.map(c => `<li>${c}</li>`).join('');
+  document.getElementById('footer-note').textContent = p.footerNote;
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  p.indicators.forEach((ind, i) => {
+    const card = document.createElement('div');
+    card.className = `card ${ind.status}`;
+    card.innerHTML = `
+      <div class="card-header">
+        <span class="card-tag">${ind.tag}</span>
+        <span class="card-signal">${ind.status==='red'?'Recessionary':ind.status==='yellow'?'Cautionary':'Healthy'}</span>
+      </div>
+      <div class="card-name">${ind.name}</div>
+      <div class="card-aspect">${ind.aspect}</div>
+      <div class="card-value-row">
+        <span class="card-value">${ind.value}</span>
+        <span class="card-unit">${ind.unit}</span>
+      </div>
+      <div class="gauge-wrap"><div class="gauge-track"><div class="gauge-fill" style="width:0%" data-target="${ind.fill}"></div></div></div>
+      <div class="card-note">${ind.note}</div>
+    `;
+    card.addEventListener('click', () => openModal(ind.name, ind.aspect, idx));
+    grid.appendChild(card);
+  });
+  requestAnimationFrame(() => setTimeout(() => {
+    document.querySelectorAll('.gauge-fill').forEach(el => { el.style.width = el.dataset.target + '%'; });
+  }, 200));
+}
+
+/* ─────────────────────────────────────────────
+   TAB SWITCHING
+───────────────────────────────────────────── */
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (btn.dataset.view === 'intro') {
+      document.getElementById('intro-page').classList.add('active');
+      document.getElementById('data-page').classList.remove('active');
+      document.getElementById('footer-click').style.display = 'none';
+    } else {
+      renderPeriod(parseInt(btn.dataset.period));
+    }
+  });
+});
+</script>
+</body>
+</html>
